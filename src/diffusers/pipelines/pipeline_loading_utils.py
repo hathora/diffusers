@@ -812,7 +812,14 @@ def load_sub_model(
         loading_kwargs["device_map"] = device_map
         loading_kwargs["max_memory"] = max_memory
         loading_kwargs["offload_folder"] = offload_folder
-        loading_kwargs["offload_state_dict"] = offload_state_dict
+        # Only pass offload_state_dict when explicitly provided and supported.
+        # Older versions of transformers will forward unknown kwargs to model __init__,
+        # causing errors like: CLIPTextModel.__init__() got an unexpected keyword argument 'offload_state_dict'.
+        if offload_state_dict is not None:
+            if is_transformers_model and transformers_version >= version.parse("4.47.0"):
+                loading_kwargs["offload_state_dict"] = offload_state_dict
+            elif is_diffusers_model:
+                loading_kwargs["offload_state_dict"] = offload_state_dict
         loading_kwargs["variant"] = model_variants.pop(name, None)
         loading_kwargs["use_safetensors"] = use_safetensors
 

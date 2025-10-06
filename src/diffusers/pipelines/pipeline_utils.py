@@ -750,6 +750,8 @@ class DiffusionPipeline(ConfigMixin, PushToHubMixin):
         device_map = kwargs.pop("device_map", None)
         max_memory = kwargs.pop("max_memory", None)
         offload_folder = kwargs.pop("offload_folder", None)
+        # Only propagate offload_state_dict if provided. Avoid injecting defaults that
+        # may be forwarded into underlying transformers model __init__.
         offload_state_dict = kwargs.pop("offload_state_dict", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", _LOW_CPU_MEM_USAGE_DEFAULT)
         variant = kwargs.pop("variant", None)
@@ -1031,6 +1033,7 @@ class DiffusionPipeline(ConfigMixin, PushToHubMixin):
                     device_map=current_device_map,
                     max_memory=max_memory,
                     offload_folder=offload_folder,
+                    # Pass offload_state_dict only when not None; compatibility handled in loading utils
                     offload_state_dict=offload_state_dict,
                     model_variants=model_variants,
                     name=name,
