@@ -846,7 +846,7 @@ def load_sub_model(
             loading_kwargs["low_cpu_mem_usage"] = False
 
     if is_transformers_model and is_transformers_version(">=", "4.57.0"):
-        loading_kwargs.pop("offload_state_dict")
+        loading_kwargs.pop("offload_state_dict", None)
 
     if (
         quantization_config is not None
