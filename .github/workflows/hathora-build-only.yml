@@ -1,0 +1,22 @@
+name: Hathora Build Only
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  hathora-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: curl -s https://raw.githubusercontent.com/hathora/ci/main/install.sh | sh
+
+      - name: Create Hathora build (no deploy)
+        env:
+          HATHORA_TOKEN: ${{ secrets.HATHORA_TOKEN }}
+        run: hathora build create --build-tag "diffusers-${{ github.sha }}"
