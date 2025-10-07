@@ -23,7 +23,7 @@ export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
 export PATH="${CUDA_HOME}/bin:${PATH}"
 
 # Diagnostics
-echo "[entrypoint] Starting Diffusers service on port 8000 (host ${HOST})"
+echo "[entrypoint] Starting Diffusers service on port 8000 (host 0.0.0.0)"
 which nvidia-smi >/dev/null 2>&1 && nvidia-smi || echo "[entrypoint] nvidia-smi not found; continuing"
 python - <<'PY'
 try:
