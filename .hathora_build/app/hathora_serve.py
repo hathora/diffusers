@@ -178,7 +178,7 @@ def _normalize_to_diffusers_repo(model_id: str) -> str:
 
 @app.on_event("startup")
 async def startup():
-    model_id = os.getenv("DIFFUSERS_MODEL_ID", "Wan-AI/Wan2.1-T2V-14B-Diffusers")
+    model_id = os.getenv("MODEL_PATH") or "Wan-AI/Wan2.1-T2V-14B-Diffusers"
     model_id = _normalize_to_diffusers_repo(model_id)
     model_id = _resolve_model_id(model_id)
     logger.info(f"Loading pipeline: {model_id}")

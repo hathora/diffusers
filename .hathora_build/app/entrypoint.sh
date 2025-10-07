@@ -12,10 +12,13 @@ if [[ -z "${HUGGINGFACE_HUB_TOKEN:-}" && -n "${HF_TOKEN}" ]]; then
   export HUGGINGFACE_HUB_TOKEN="${HF_TOKEN}"
 fi
 
+export MODEL_ID="${MODEL_ID:-}"
 export MODEL_PATH="${MODEL_PATH:-}"
-if [[ -z "${DIFFUSERS_MODEL_ID:-}" && -n "${MODEL_PATH}" ]]; then
-  export DIFFUSERS_MODEL_ID="${MODEL_PATH}"
+if [[ -z "${MODEL_PATH}" && -n "${MODEL_ID}" ]]; then
+  export MODEL_PATH="${MODEL_ID}"
 fi
+
+export VACE_AUTOCast_BF16="${VACE_AUTOCast_BF16:-true}"
 
 # CUDA envs
 export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
