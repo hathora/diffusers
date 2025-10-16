@@ -1,0 +1,3 @@
+# Core requirements for FLUX Triton kernels
+# Note: torch should already be installed separately
+triton>=2.3.1,<=3.3.1

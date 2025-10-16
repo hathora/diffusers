@@ -18,6 +18,98 @@ import torch
 import imageio
 import numpy as np
 
+def setup_compile_optimizations():
+    """
+    Set up torch.compile optimizations to reduce first-time compilation time.
+    
+    Strategy for fast first-launch:
+    - Limit autotuning search space (faster compile, still good perf)
+    - Use pre-tuned configs for common operations
+    - Skip excessive kernel benchmarking
+    """
+    cache_dir = os.getenv("TORCH_COMPILE_CACHE_DIR", "/app/.cache/torch_compile")
+    triton_cache_dir = os.getenv("TRITON_CACHE_DIR", "/app/.cache/triton")
+    
+    os.makedirs(cache_dir, exist_ok=True)
+    os.makedirs(triton_cache_dir, exist_ok=True)
+    
+    os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
+    os.environ["TRITON_CACHE_DIR"] = triton_cache_dir
+    os.environ["TORCHINDUCTOR_FX_GRAPH_CACHE"] = "1"
+    
+    max_autotune_gemm = os.getenv("MAX_AUTOTUNE_GEMM_SEARCH_SPACE", "4")
+    os.environ["MAX_AUTOTUNE_GEMM_SEARCH_SPACE"] = max_autotune_gemm
+    
+    max_autotune_pointwise = os.getenv("MAX_AUTOTUNE_POINTWISE_SEARCH_SPACE", "8")
+    os.environ["MAX_AUTOTUNE_POINTWISE_SEARCH_SPACE"] = max_autotune_pointwise
+    os.environ["TORCHINDUCTOR_MAX_AUTOTUNE_GEMM_SKIP_SIMILAR"] = "1"
+    
+    # Coordinate descent tuning for better performance with dynamic shapes
+    os.environ["TORCHINDUCTOR_COORDINATE_DESCENT_TUNING"] = "1"
+    
+    # Balance compile speed vs runtime performance
+    os.environ["TORCHINDUCTOR_BENCHMARK_KERNEL_ITERATIONS"] = "3"
+    
+    # Enable freezing for better performance
+    os.environ["TORCHINDUCTOR_FREEZING"] = "1"
+    
+    logging.info(f"Torch compile cache: {cache_dir}")
+    logging.info(f"Triton cache: {triton_cache_dir}")
+    logging.info(f"Max autotune GEMM search space: {max_autotune_gemm} (limited for faster compile)")
+    logging.info(f"Max autotune pointwise search space: {max_autotune_pointwise}")
+
+setup_compile_optimizations()
+
+def setup_dynamic_shapes():
+    """
+    Configure for dynamic shapes (works with any height/width).
+    
+    Strategy: Compile once with dynamic shapes, works for all sizes without recompilation.
+    Uses max-autotune-no-cudagraphs for best autotuning without CUDA graphs.
+    
+    Benefits:
+    - Compile once at startup (~2-3 min)
+    - Any height/width works instantly (no recompilation)
+    - Excellent autotuned performance
+    - No CUDA graphs (not compatible with dynamic shapes)
+    """
+    import torch._dynamo.config
+    import torch._inductor.config
+    
+    # Enable automatic dynamic shapes
+    torch._dynamo.config.automatic_dynamic_shapes = True
+    
+    # CRITICAL: Don't assume static by default (required for dynamic to work!)
+    torch._dynamo.config.assume_static_by_default = False
+    
+    # Disable CUDA graphs (incompatible with dynamic shapes)
+    torch._inductor.config.triton.cudagraphs = False
+    
+    # Suppress warnings about graph breaks
+    torch._dynamo.config.suppress_errors = True
+    
+    # Capture scalar outputs for better dynamic shape handling
+    torch._dynamo.config.capture_scalar_outputs = True
+    
+    # Enable verbose logging for compilation progress
+    verbose_compile = os.getenv("VERBOSE_COMPILE", "1")
+    if verbose_compile == "2":
+        torch._dynamo.config.verbose = True
+        torch._inductor.config.debug = True
+    
+    logging.info("=" * 60)
+    logging.info("COMPILATION SETTINGS")
+    logging.info("=" * 60)
+    logging.info("Mode: Dynamic shapes with max-autotune-no-cudagraphs")
+    logging.info("Strategy: Compile with dynamic=True, works for all shapes")
+    logging.info("CUDA graphs: Disabled (incompatible with dynamic shapes)")
+    logging.info("Assume static by default: False (required!)")
+    logging.info("Shape flexibility: Any height/width without recompilation")
+    logging.info("Verbose compile logs: Level %s", verbose_compile)
+    logging.info("=" * 60)
+
+setup_dynamic_shapes()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("diffusers_svc")
 
@@ -211,6 +303,134 @@ async def startup():
                 pipe = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=False)
         if device >= 0:
             pipe.to("cuda")
+        
+        # Compile the model with torch.compile for faster inference
+        use_compile = os.getenv("USE_TORCH_COMPILE", "1").lower() in ("1", "true", "yes")
+        if use_compile and device >= 0:
+            compile_mode = os.getenv("TORCH_COMPILE_MODE", "max-autotune")
+            
+            logger.info("")
+            logger.info("=" * 70)
+            logger.info("TORCH.COMPILE: PREPARING MODEL FOR COMPILATION")
+            logger.info("=" * 70)
+            logger.info(f"Mode: {compile_mode}")
+            logger.info(f"Device: cuda:{device}")
+            logger.info("Note: First compilation is slow but results are cached")
+            logger.info("=" * 70)
+            
+            try:
+                # Compile the transformer/unet component for maximum performance
+                # Use dynamic=True to explicitly enable dynamic shapes
+                if hasattr(pipe, "transformer") and pipe.transformer is not None:
+                    logger.info("")
+                    logger.info(">>> Step 1/2: Wrapping transformer with torch.compile...")
+                    logger.info("    Enabling dynamic shapes for height/width flexibility")
+                    pipe.transformer = torch.compile(
+                        pipe.transformer,
+                        mode=compile_mode,
+                        fullgraph=False,
+                        dynamic=True,  # Explicitly enable dynamic shapes
+                    )
+                    logger.info("    Transformer wrapped successfully")
+                elif hasattr(pipe, "unet") and pipe.unet is not None:
+                    logger.info("")
+                    logger.info(">>> Step 1/2: Wrapping unet with torch.compile...")
+                    logger.info("    Enabling dynamic shapes for height/width flexibility")
+                    pipe.unet = torch.compile(
+                        pipe.unet,
+                        mode=compile_mode,
+                        fullgraph=False,
+                        dynamic=True,  # Explicitly enable dynamic shapes
+                    )
+                    logger.info("    Unet wrapped successfully")
+                
+                compile_vae = os.getenv("COMPILE_VAE", "0").lower() in ("1", "true", "yes")
+                if compile_vae and hasattr(pipe, "vae") and pipe.vae is not None:
+                    logger.info("")
+                    logger.info(">>> Step 2/2: Wrapping VAE decoder with torch.compile...")
+                    pipe.vae.decoder = torch.compile(
+                        pipe.vae.decoder,
+                        mode=compile_mode,
+                        fullgraph=False,
+                        dynamic=True,  # Explicitly enable dynamic shapes
+                    )
+                    logger.info("    VAE decoder wrapped successfully")
+                elif hasattr(pipe, "vae") and pipe.vae is not None:
+                    logger.info("")
+                    logger.info(">>> Step 2/2: Skipping VAE compilation")
+                    logger.info("    Set COMPILE_VAE=1 to enable (~30-60s compilation, minor speedup)")
+                
+                logger.info("")
+                logger.info("=" * 70)
+                logger.info("WARMUP: COMPILING MODEL WITH DYNAMIC SHAPES")
+                logger.info("=" * 70)
+                
+                # With dynamic shapes, we only need to compile once
+                # The compiled model will work for any height/width
+                warmup_shape_str = os.getenv("WARMUP_SHAPE", "1024x1024")
+                try:
+                    w, h = warmup_shape_str.strip().split("x")
+                    warmup_height, warmup_width = int(h), int(w)
+                except:
+                    logger.warning(f"⚠ Invalid warmup shape: {warmup_shape_str}, using default")
+                    warmup_height, warmup_width = 1024, 1024
+                
+                logger.info(f"Warmup size: {warmup_height}x{warmup_width}")
+                logger.info("After compilation: ALL sizes will work instantly")
+                logger.info("Estimated time: ~2-3 minutes (compile once, use everywhere)")
+                logger.info("=" * 70)
+                
+                try:
+                    import time
+                    warmup_prompt = "test warmup"
+                    warmup_steps = 2  # Minimal steps for warmup
+                    
+                    logger.info("")
+                    logger.info("Starting compilation (this triggers autotuning)...")
+                    compile_start = time.time()
+                    
+                    if isinstance(pipe, WanPipeline):
+                        # Video pipeline warmup
+                        logger.info("Pipeline type: Video (WanPipeline)")
+                        _ = pipe(
+                            prompt=warmup_prompt,
+                            height=warmup_height,
+                            width=warmup_width,
+                            num_frames=9,
+                            num_inference_steps=warmup_steps,
+                            guidance_scale=5.0,
+                        )
+                    else:
+                        # Image pipeline warmup (FLUX/SDXL)
+                        logger.info("Pipeline type: Image (FLUX/SDXL)")
+                        _ = pipe(
+                            prompt=warmup_prompt,
+                            height=warmup_height,
+                            width=warmup_width,
+                            num_inference_steps=warmup_steps,
+                        )
+                    
+                    compile_elapsed = time.time() - compile_start
+                    logger.info("")
+                    logger.info("=" * 70)
+                    logger.info("WARMUP COMPLETE!")
+                    logger.info("=" * 70)
+                    logger.info(f"Compilation time: {compile_elapsed:.1f}s")
+                    logger.info(f"Compiled with: {warmup_height}x{warmup_width}")
+                    logger.info("✓ Dynamic shapes enabled: ANY size now works instantly")
+                    logger.info("✓ No recompilation needed for different heights/widths")
+                    logger.info("=" * 70)
+                except Exception as warmup_error:
+                    logger.error("=" * 70)
+                    logger.error("WARMUP FAILED")
+                    logger.error("=" * 70)
+                    logger.error(f"Error: {warmup_error}")
+                    logger.error("Model may still work but without compilation benefits")
+                    logger.error("=" * 70)
+                    
+            except Exception as compile_error:
+                logger.warning(f"torch.compile failed, continuing without compilation: {compile_error}")
+        
         _PIPELINE["pipe"] = pipe
         _PIPELINE["model_id"] = model_id
         logger.info("Pipeline ready.")

@@ -1,0 +1,16 @@
+# Requirements for running Triton kernel tests
+
+# Core dependencies
+torch>=2.0.0
+triton>=2.3.1
+
+# Testing framework
+pytest>=7.0.0
+pytest-cov>=4.0.0  # For coverage reports
+pytest-xdist>=3.0.0  # For parallel test execution
+pytest-benchmark>=4.0.0  # For performance benchmarking
+pytest-timeout>=2.0.0  # For test timeouts
+
+# Optional but useful
+hypothesis>=6.0.0  # For property-based testing
+

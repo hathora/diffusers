@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import inspect
+import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -38,6 +39,62 @@ from ..modeling_outputs import Transformer2DModelOutput
 from ..modeling_utils import ModelMixin
 from ..normalization import AdaLayerNormContinuous, AdaLayerNormZero, AdaLayerNormZeroSingle
 
+# Import Triton kernels
+try:
+    from ...kernels import (
+        RopeFunction,
+        TritonRMSNorm,
+        GELUMulFunction,
+        TRITON_AVAILABLE,
+    )
+except ImportError:
+    TRITON_AVAILABLE = False
+    GELUMulFunction = None
+    class TritonRMSNorm(nn.Module):
+        """Fallback RMSNorm when Triton is not available"""
+        def __init__(self, hidden_size, eps=1e-6, offset=0.0, init_fn="ones", in_place=True, row_mode=None):
+            super().__init__()
+            self.weight = nn.Parameter(
+                torch.ones(hidden_size) if init_fn == "ones" else torch.zeros(hidden_size)
+            )
+            self.variance_epsilon = eps
+            self.offset = offset
+        
+        def forward(self, hidden_states):
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+            return hidden_states * (self.offset + self.weight)
+
+USE_TRITON_OPS = os.environ.get("USE_TRITON_OPS", "1").lower() in ("1", "true", "yes")
+TRITON_ENABLED = TRITON_AVAILABLE and USE_TRITON_OPS
+
+
+class TritonGEGLUMLP(nn.Module):
+    """
+    GeGLU MLP using Triton kernels - matches Liger's LigerGELUMLP API.
+    
+    This implements: down_proj(GELU(gate_proj(x)) * up_proj(x))
+    
+    Note: This uses GeGLU architecture which is NOT compatible with 
+    standard MLP pretrained weights. Only use for training from scratch
+    or when weights are specifically saved for this architecture.
+    """
+    def __init__(self, hidden_size: int, intermediate_size: int, bias: bool = True):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.intermediate_size = intermediate_size
+        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
+        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
+        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
+    
+    def forward(self, x):
+        gate = self.gate_proj(x)
+        up = self.up_proj(x)
+        
+        if TRITON_ENABLED and x.is_cuda:
+            return self.down_proj(GELUMulFunction.apply(gate, up))
+        else:
+            return self.down_proj(F.gelu(gate, approximate="tanh") * up)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -112,8 +169,22 @@ class FluxAttnProcessor:
             value = torch.cat([encoder_value, value], dim=1)
 
         if image_rotary_emb is not None:
-            query = apply_rotary_emb(query, image_rotary_emb, sequence_dim=1)
-            key = apply_rotary_emb(key, image_rotary_emb, sequence_dim=1)
+            if TRITON_ENABLED and query.is_cuda:
+                # image_rotary_emb is (cos, sin) tuple
+                cos, sin = image_rotary_emb
+                # Triton kernel expects cos/sin shaped as (1, seq_len, head_dim) or (bsz, seq_len, head_dim)
+                if cos.dim() == 2:
+                    cos = cos.unsqueeze(0)
+                    sin = sin.unsqueeze(0)
+                # RopeFunction expects inputs as (B, H, S, D)
+                q_in = query.transpose(1, 2)
+                k_in = key.transpose(1, 2)
+                q_out, k_out = RopeFunction.apply(q_in, k_in, cos, sin)
+                query = q_out.transpose(1, 2)
+                key = k_out.transpose(1, 2)
+            else:
+                query = apply_rotary_emb(query, image_rotary_emb, sequence_dim=1)
+                key = apply_rotary_emb(key, image_rotary_emb, sequence_dim=1)
 
         hidden_states = dispatch_attention_fn(
             query,
@@ -217,8 +288,22 @@ class FluxIPAdapterAttnProcessor(torch.nn.Module):
             value = torch.cat([encoder_value, value], dim=1)
 
         if image_rotary_emb is not None:
-            query = apply_rotary_emb(query, image_rotary_emb, sequence_dim=1)
-            key = apply_rotary_emb(key, image_rotary_emb, sequence_dim=1)
+            if TRITON_ENABLED and query.is_cuda:
+                # image_rotary_emb is (cos, sin) tuple for Triton
+                cos, sin = image_rotary_emb
+                # Triton kernel expects cos/sin shaped as (1, seq_len, head_dim) or (bsz, seq_len, head_dim)
+                if cos.dim() == 2:
+                    cos = cos.unsqueeze(0)
+                    sin = sin.unsqueeze(0)
+                # RopeFunction expects inputs as (B, H, S, D)
+                q_in = query.transpose(1, 2)
+                k_in = key.transpose(1, 2)
+                q_out, k_out = RopeFunction.apply(q_in, k_in, cos, sin)
+                query = q_out.transpose(1, 2)
+                key = k_out.transpose(1, 2)
+            else:
+                query = apply_rotary_emb(query, image_rotary_emb, sequence_dim=1)
+                key = apply_rotary_emb(key, image_rotary_emb, sequence_dim=1)
 
         hidden_states = dispatch_attention_fn(
             query,
@@ -310,8 +395,8 @@ class FluxAttention(torch.nn.Module, AttentionModuleMixin):
         self.added_kv_proj_dim = added_kv_proj_dim
         self.added_proj_bias = added_proj_bias
 
-        self.norm_q = torch.nn.RMSNorm(dim_head, eps=eps, elementwise_affine=elementwise_affine)
-        self.norm_k = torch.nn.RMSNorm(dim_head, eps=eps, elementwise_affine=elementwise_affine)
+        self.norm_q = TritonRMSNorm(dim_head, eps=eps)
+        self.norm_k = TritonRMSNorm(dim_head, eps=eps)
         self.to_q = torch.nn.Linear(query_dim, self.inner_dim, bias=bias)
         self.to_k = torch.nn.Linear(query_dim, self.inner_dim, bias=bias)
         self.to_v = torch.nn.Linear(query_dim, self.inner_dim, bias=bias)
@@ -322,8 +407,8 @@ class FluxAttention(torch.nn.Module, AttentionModuleMixin):
             self.to_out.append(torch.nn.Dropout(dropout))
 
         if added_kv_proj_dim is not None:
-            self.norm_added_q = torch.nn.RMSNorm(dim_head, eps=eps)
-            self.norm_added_k = torch.nn.RMSNorm(dim_head, eps=eps)
+            self.norm_added_q = TritonRMSNorm(dim_head, eps=eps)
+            self.norm_added_k = TritonRMSNorm(dim_head, eps=eps)
             self.add_q_proj = torch.nn.Linear(added_kv_proj_dim, self.inner_dim, bias=added_proj_bias)
             self.add_k_proj = torch.nn.Linear(added_kv_proj_dim, self.inner_dim, bias=added_proj_bias)
             self.add_v_proj = torch.nn.Linear(added_kv_proj_dim, self.inner_dim, bias=added_proj_bias)
@@ -359,8 +444,21 @@ class FluxSingleTransformerBlock(nn.Module):
         self.mlp_hidden_dim = int(dim * mlp_ratio)
 
         self.norm = AdaLayerNormZeroSingle(dim)
-        self.proj_mlp = nn.Linear(dim, self.mlp_hidden_dim)
-        self.act_mlp = nn.GELU(approximate="tanh")
+        
+        # Conditionally use GeGLU (gate + value projections) or standard GELU
+        # Note: GeGLU requires separate weights, incompatible with standard pretrained weights
+        use_geglu = os.environ.get("USE_GEGLU", "0").lower() in ("1", "true", "yes")
+        if use_geglu and TRITON_ENABLED:
+            # GeGLU: two projections for gate and value
+            self.proj_mlp_gate = nn.Linear(dim, self.mlp_hidden_dim)
+            self.proj_mlp_value = nn.Linear(dim, self.mlp_hidden_dim)
+            self.use_geglu = True
+        else:
+            # Standard: single projection + GELU
+            self.proj_mlp = nn.Linear(dim, self.mlp_hidden_dim)
+            self.act_mlp = nn.GELU(approximate="tanh")
+            self.use_geglu = False
+        
         self.proj_out = nn.Linear(dim + self.mlp_hidden_dim, dim)
 
         self.attn = FluxAttention(
@@ -387,7 +485,15 @@ class FluxSingleTransformerBlock(nn.Module):
 
         residual = hidden_states
         norm_hidden_states, gate = self.norm(hidden_states, emb=temb)
-        mlp_hidden_states = self.act_mlp(self.proj_mlp(norm_hidden_states))
+        
+        # Compute MLP activations: use GeGLU if enabled, otherwise standard GELU
+        if self.use_geglu:
+            gate_output = self.proj_mlp_gate(norm_hidden_states)
+            value_output = self.proj_mlp_value(norm_hidden_states)
+            mlp_hidden_states = GELUMulFunction.apply(gate_output, value_output)
+        else:
+            mlp_hidden_states = self.act_mlp(self.proj_mlp(norm_hidden_states))
+        
         joint_attention_kwargs = joint_attention_kwargs or {}
         attn_output = self.attn(
             hidden_states=norm_hidden_states,
@@ -429,10 +535,20 @@ class FluxTransformerBlock(nn.Module):
         )
 
         self.norm2 = nn.LayerNorm(dim, elementwise_affine=False, eps=1e-6)
-        self.ff = FeedForward(dim=dim, dim_out=dim, activation_fn="gelu-approximate")
+        
+        # Conditionally use Triton GeGLU MLP or standard FeedForward
+        use_geglu = os.environ.get("USE_GEGLU", "0").lower() in ("1", "true", "yes")
+        if use_geglu and TRITON_ENABLED:
+            self.ff = TritonGEGLUMLP(hidden_size=dim, intermediate_size=int(dim * 4), bias=True)
+        else:
+            self.ff = FeedForward(dim=dim, dim_out=dim, activation_fn="gelu-approximate")
 
         self.norm2_context = nn.LayerNorm(dim, elementwise_affine=False, eps=1e-6)
-        self.ff_context = FeedForward(dim=dim, dim_out=dim, activation_fn="gelu-approximate")
+        
+        if use_geglu and TRITON_ENABLED:
+            self.ff_context = TritonGEGLUMLP(hidden_size=dim, intermediate_size=int(dim * 4), bias=True)
+        else:
+            self.ff_context = FeedForward(dim=dim, dim_out=dim, activation_fn="gelu-approximate")
 
     def forward(
         self,
