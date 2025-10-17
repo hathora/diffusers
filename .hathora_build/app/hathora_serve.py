@@ -137,14 +137,14 @@ app = FastAPI(default_response_class=JSONResponse)
 _PIPELINE: dict = {"pipe": None, "model_id": None}
 
 # Authentication
-auth = HTTPBearer()
+auth = HTTPBearer(auto_error=False)
 API_TOKEN = os.getenv("API_KEY")
 
 def require_token(creds: HTTPAuthorizationCredentials = Depends(auth)):
     if not API_TOKEN:
-        return
-    if creds is None or creds.scheme.lower() != "bearer" or creds.credentials != API_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+        return  # Skip auth if not configured
+    if not creds or creds.credentials != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 def custom_openapi():
     if getattr(app, "openapi_schema", None):
@@ -188,12 +188,12 @@ def _ensure_fhwc_uint8(frames_any):
     return arr
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/", include_in_schema=False, dependencies=[Depends(require_token)])
 async def root():
     return RedirectResponse(url="/docs")
 
 
-@app.get("/openapi.json", include_in_schema=False)
+@app.get("/openapi.json", include_in_schema=False, dependencies=[Depends(require_token)])
 async def openapi_json():
     try:
         schema = app.openapi()
