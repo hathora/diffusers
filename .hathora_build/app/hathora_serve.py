@@ -5,8 +5,9 @@ import logging
 import pathlib
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from fastapi.openapi.utils import get_openapi
 
@@ -134,6 +135,17 @@ class T2IRequest(BaseModel):
 app = FastAPI(default_response_class=JSONResponse)
 
 _PIPELINE: dict = {"pipe": None, "model_id": None}
+
+# Authentication
+auth = HTTPBearer()
+API_TOKEN = os.getenv("API_KEY")
+
+def require_token(creds: HTTPAuthorizationCredentials = Depends(auth)):
+    if not API_TOKEN:
+        return
+    if creds is None or creds.scheme.lower() != "bearer" or creds.credentials != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+
 def custom_openapi():
     if getattr(app, "openapi_schema", None):
         return app.openapi_schema
@@ -200,6 +212,7 @@ async def openapi_json():
         400: {"content": {"application/json": {}}, "description": "Bad Request"},
         500: {"content": {"application/json": {}}, "description": "Error"},
     },
+    dependencies=[Depends(require_token)],
 )
 async def t2i(req: T2IRequest):
     try:
@@ -438,7 +451,7 @@ async def startup():
         logger.exception(f"Pipeline load failed: {e}")
 
 
-@app.get("/health", response_class=JSONResponse)
+@app.get("/health", response_class=JSONResponse, dependencies=[Depends(require_token)])
 async def health():
     ok = _PIPELINE["pipe"] is not None
     return {"status": "ok" if ok else "loading"}
@@ -451,6 +464,7 @@ async def health():
         200: {"content": {"video/mp4": {}}, "description": "Generated MP4 video"},
         500: {"content": {"application/json": {}}, "description": "Error"},
     },
+    dependencies=[Depends(require_token)],
 )
 async def t2v(req: T2VRequest):
     try:
