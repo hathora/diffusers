@@ -138,7 +138,7 @@ _PIPELINE: dict = {"pipe": None, "model_id": None}
 
 # Authentication
 auth = HTTPBearer(auto_error=False)
-API_TOKEN = os.getenv("HATHORA_APP_SECRET")
+API_TOKEN = os.getenv("API_KEY") or os.getenv("HATHORA_APP_SECRET")
 
 def require_token(creds: HTTPAuthorizationCredentials = Depends(auth)):
     if not API_TOKEN:
