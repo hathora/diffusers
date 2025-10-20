@@ -182,3 +182,13 @@ wandb
 
 # output png
 out.png
+flux_cache/*.bin
+flux_cache/*.so
+flux_cache/*.cubin
+flux_cache/*.ptx
+flux_cache/**/lock
+!flux_cache/README.md
+!flux_cache/.gitkeep
+
+# HuggingFace model cache (23GB, baked into Docker image)
+hf_cache/

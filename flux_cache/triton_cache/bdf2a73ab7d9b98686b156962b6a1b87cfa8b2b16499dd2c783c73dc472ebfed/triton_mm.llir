@@ -1,0 +1,581 @@
+; ModuleID = 'LLVMDialectModule'
+source_filename = "LLVMDialectModule"
+
+@global_smem = external addrspace(3) global [0 x i8], align 16
+
+define void @triton_mm(ptr addrspace(1) %0, ptr addrspace(1) %1, ptr addrspace(1) %2, i32 %3) local_unnamed_addr !dbg !7 {
+  %5 = mul i32 %3, 3072, !dbg !10
+  %6 = icmp eq i32 %5, 0, !dbg !11
+  br i1 %6, label %common.ret, label %7, !dbg !11
+
+common.ret:                                       ; preds = %4, %254
+  ret void, !dbg !12
+
+7:                                                ; preds = %4
+  %8 = tail call i32 asm "mov.u32 $0, %ctaid.x;", "=r"() #3, !dbg !13
+  %9 = add i32 %3, 63, !dbg !14
+  %10 = sdiv i32 %9, 64, !dbg !15
+  %.frozen = freeze i32 %8
+  %11 = sdiv i32 %.frozen, 192, !dbg !16
+  %12 = shl nsw i32 %11, 3, !dbg !17
+  %13 = sub nsw i32 %10, %12, !dbg !18
+  %14 = tail call i32 @llvm.smin.i32(i32 %13, i32 8), !dbg !19
+  %15 = srem i32 %8, %14, !dbg !20
+  %16 = add nsw i32 %12, %15, !dbg !21
+  %17 = mul i32 %11, 192
+  %.decomposed = sub i32 %.frozen, %17
+  %18 = sdiv i32 %.decomposed, %14, !dbg !22
+  %19 = shl i32 %16, 6, !dbg !23
+  %20 = tail call i32 @llvm.nvvm.read.ptx.sreg.tid.x(), !dbg !24
+  %21 = lshr i32 %20, 5, !dbg !24
+  %22 = lshr i32 %20, 2, !dbg !24
+  %23 = and i32 %22, 63, !dbg !24
+  %24 = lshr i32 %20, 4, !dbg !24
+  %.lobit1 = and i32 %24, 1, !dbg !24
+  %25 = and i32 %24, 7, !dbg !24
+  %26 = lshr i32 %20, 4, !dbg !24
+  %27 = and i32 %26, 8, !dbg !24
+  %28 = or disjoint i32 %25, %27, !dbg !24
+  %29 = or disjoint i32 %19, %23, !dbg !25
+  %30 = or disjoint i32 %19, %28, !dbg !24
+  %31 = shl nsw i32 %18, 7, !dbg !26
+  %32 = or disjoint i32 %23, 64, !dbg !27
+  %33 = shl i32 %20, 3, !dbg !27
+  %34 = and i32 %33, 24, !dbg !27
+  %35 = or disjoint i32 %31, %23, !dbg !28
+  %36 = or disjoint i32 %31, %32, !dbg !28
+  %37 = srem i32 %29, %3, !dbg !29
+  %38 = srem i32 %35, 3072, !dbg !30
+  %39 = srem i32 %36, 3072, !dbg !30
+  %40 = shl i32 %37, 6, !dbg !31
+  %41 = or disjoint i32 %40, %34, !dbg !32
+  %42 = sext i32 %41 to i64, !dbg !33
+  %43 = getelementptr i16, ptr addrspace(1) %0, i64 %42, !dbg !33
+  %44 = shl nsw i32 %38, 6, !dbg !34
+  %45 = shl nsw i32 %39, 6, !dbg !34
+  %46 = or disjoint i32 %44, %34, !dbg !35
+  %47 = or disjoint i32 %45, %34, !dbg !35
+  %48 = sext i32 %46 to i64, !dbg !36
+  %49 = getelementptr i16, ptr addrspace(1) %1, i64 %48, !dbg !36
+  %50 = sext i32 %47 to i64, !dbg !36
+  %51 = getelementptr i16, ptr addrspace(1) %1, i64 %50, !dbg !36
+  %52 = shl nuw nsw i32 %23, 5, !dbg !37
+  %53 = xor i32 %33, %20, !dbg !37
+  %54 = and i32 %53, 24, !dbg !37
+  %55 = or disjoint i32 %52, %54, !dbg !37
+  %56 = zext nneg i32 %55 to i64, !dbg !37
+  %57 = getelementptr i16, ptr addrspace(3) @global_smem, i64 %56, !dbg !37
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %57, ptr addrspace(1) %43, i32 16, i1 true) #3, !dbg !37
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !37
+  %58 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 16384), i64 %56, !dbg !38
+  %59 = shl nuw nsw i32 %32, 5, !dbg !38
+  %60 = or disjoint i32 %59, %54, !dbg !38
+  %61 = zext nneg i32 %60 to i64, !dbg !38
+  %62 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 16384), i64 %61, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %58, ptr addrspace(1) %49, i32 16, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %62, ptr addrspace(1) %51, i32 16, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !38
+  %63 = getelementptr i8, ptr addrspace(1) %43, i64 64, !dbg !39
+  %64 = getelementptr i8, ptr addrspace(1) %49, i64 64, !dbg !40
+  %65 = getelementptr i8, ptr addrspace(1) %51, i64 64, !dbg !40
+  tail call void @llvm.nvvm.barrier0(), !dbg !37
+  %66 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 4096), i64 %56, !dbg !37
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %66, ptr addrspace(1) %63, i32 16, i1 true) #3, !dbg !37
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !37
+  %67 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 24576), i64 %56, !dbg !38
+  %68 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 24576), i64 %61, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %67, ptr addrspace(1) %64, i32 16, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %68, ptr addrspace(1) %65, i32 16, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !38
+  %69 = getelementptr i8, ptr addrspace(1) %43, i64 128, !dbg !39
+  %70 = getelementptr i8, ptr addrspace(1) %49, i64 128, !dbg !40
+  %71 = getelementptr i8, ptr addrspace(1) %51, i64 128, !dbg !40
+  tail call void @llvm.nvvm.barrier0(), !dbg !37
+  %72 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 8192), i64 %56, !dbg !37
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %72, ptr addrspace(1) %69, i32 0, i1 true) #3, !dbg !37
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !37
+  %73 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 32768), i64 %56, !dbg !38
+  %74 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 32768), i64 %61, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %73, ptr addrspace(1) %70, i32 0, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %74, ptr addrspace(1) %71, i32 0, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !38
+  %75 = and i32 %21, 134217724
+  %76 = shl i32 %20, 1
+  %77 = and i32 %76, 256
+  %78 = zext nneg i32 %77 to i64
+  %79 = or disjoint i64 %78, -9223371899382267904
+  %80 = or disjoint i64 %78, -9223371899382267902
+  br label %81, !dbg !41
+
+81:                                               ; preds = %7, %81
+  %82 = phi i32 [ -1, %7 ], [ %119, %81 ]
+  %83 = phi i32 [ 2, %7 ], [ %246, %81 ]
+  %.pn3281 = phi ptr addrspace(1) [ %71, %7 ], [ %243, %81 ]
+  %.pn4880 = phi ptr addrspace(1) [ %70, %7 ], [ %242, %81 ]
+  %.pn1679 = phi ptr addrspace(1) [ %69, %7 ], [ %241, %81 ]
+  %84 = phi float [ 0.000000e+00, %7 ], [ %209, %81 ]
+  %85 = phi float [ 0.000000e+00, %7 ], [ %210, %81 ]
+  %86 = phi float [ 0.000000e+00, %7 ], [ %211, %81 ]
+  %87 = phi float [ 0.000000e+00, %7 ], [ %212, %81 ]
+  %88 = phi float [ 0.000000e+00, %7 ], [ %213, %81 ]
+  %89 = phi float [ 0.000000e+00, %7 ], [ %214, %81 ]
+  %90 = phi float [ 0.000000e+00, %7 ], [ %215, %81 ]
+  %91 = phi float [ 0.000000e+00, %7 ], [ %216, %81 ]
+  %92 = phi float [ 0.000000e+00, %7 ], [ %217, %81 ]
+  %93 = phi float [ 0.000000e+00, %7 ], [ %218, %81 ]
+  %94 = phi float [ 0.000000e+00, %7 ], [ %219, %81 ]
+  %95 = phi float [ 0.000000e+00, %7 ], [ %220, %81 ]
+  %96 = phi float [ 0.000000e+00, %7 ], [ %221, %81 ]
+  %97 = phi float [ 0.000000e+00, %7 ], [ %222, %81 ]
+  %98 = phi float [ 0.000000e+00, %7 ], [ %223, %81 ]
+  %99 = phi float [ 0.000000e+00, %7 ], [ %224, %81 ]
+  %100 = phi float [ 0.000000e+00, %7 ], [ %225, %81 ]
+  %101 = phi float [ 0.000000e+00, %7 ], [ %226, %81 ]
+  %102 = phi float [ 0.000000e+00, %7 ], [ %227, %81 ]
+  %103 = phi float [ 0.000000e+00, %7 ], [ %228, %81 ]
+  %104 = phi float [ 0.000000e+00, %7 ], [ %229, %81 ]
+  %105 = phi float [ 0.000000e+00, %7 ], [ %230, %81 ]
+  %106 = phi float [ 0.000000e+00, %7 ], [ %231, %81 ]
+  %107 = phi float [ 0.000000e+00, %7 ], [ %232, %81 ]
+  %108 = phi float [ 0.000000e+00, %7 ], [ %233, %81 ]
+  %109 = phi float [ 0.000000e+00, %7 ], [ %234, %81 ]
+  %110 = phi float [ 0.000000e+00, %7 ], [ %235, %81 ]
+  %111 = phi float [ 0.000000e+00, %7 ], [ %236, %81 ]
+  %112 = phi float [ 0.000000e+00, %7 ], [ %237, %81 ]
+  %113 = phi float [ 0.000000e+00, %7 ], [ %238, %81 ]
+  %114 = phi float [ 0.000000e+00, %7 ], [ %239, %81 ]
+  %115 = phi float [ 0.000000e+00, %7 ], [ %240, %81 ]
+  %116 = phi i1 [ true, %7 ], [ false, %81 ]
+  %117 = add i32 %82, 1, !dbg !41
+  %118 = icmp slt i32 %117, 4, !dbg !41
+  %119 = select i1 %118, i32 %117, i32 0, !dbg !41
+  %120 = shl i32 %119, 11, !dbg !37
+  %121 = sext i32 %120 to i64, !dbg !37
+  %122 = getelementptr i16, ptr addrspace(3) @global_smem, i64 %121, !dbg !37
+  tail call void asm sideeffect "cp.async.wait_group 0x4;", ""() #3, !dbg !37
+  tail call void @llvm.nvvm.barrier0(), !dbg !37
+  %123 = shl i32 %119, 12, !dbg !38
+  %124 = sext i32 %123 to i64, !dbg !38
+  %125 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 16384), i64 %124, !dbg !38
+  %126 = tail call i32 @llvm.nvvm.shfl.sync.idx.i32(i32 -1, i32 %75, i32 0, i32 31), !dbg !42
+  tail call void asm sideeffect "wgmma.fence.sync.aligned;", ""() #3, !dbg !42
+  %127 = shl i32 %126, 6, !dbg !42
+  %128 = and i32 %127, 192, !dbg !42
+  %129 = zext nneg i32 %128 to i64, !dbg !42
+  %130 = ptrtoint ptr addrspace(3) %122 to i64, !dbg !42
+  %131 = lshr exact i64 %130, 4, !dbg !42
+  %132 = and i64 %131, 16383, !dbg !42
+  %133 = or disjoint i64 %132, -9223371899399045120, !dbg !42
+  %134 = add nuw nsw i64 %133, %129, !dbg !42
+  %135 = ptrtoint ptr addrspace(3) %125 to i64, !dbg !42
+  %136 = lshr exact i64 %135, 4, !dbg !42
+  %137 = and i64 %136, 16383, !dbg !42
+  %138 = add nuw nsw i64 %79, %137, !dbg !42
+  %139 = tail call { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } asm sideeffect "wgmma.mma_async.sync.aligned.m64n64k16.f32.bf16.bf16 {$0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31}, $64, $65, 1, 1, 1, 0, 0;", "=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,l,l"(float %84, float %85, float %86, float %87, float %88, float %89, float %90, float %91, float %92, float %93, float %94, float %95, float %96, float %97, float %98, float %99, float %100, float %101, float %102, float %103, float %104, float %105, float %106, float %107, float %108, float %109, float %110, float %111, float %112, float %113, float %114, float %115, i64 %134, i64 %138) #3, !dbg !42
+  %140 = add nuw nsw i64 %132, -9223371899399045118, !dbg !42
+  %141 = add nuw nsw i64 %140, %129, !dbg !42
+  %142 = add nuw nsw i64 %80, %137, !dbg !42
+  %143 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 0, !dbg !42
+  %144 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 1, !dbg !42
+  %145 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 2, !dbg !42
+  %146 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 3, !dbg !42
+  %147 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 4, !dbg !42
+  %148 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 5, !dbg !42
+  %149 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 6, !dbg !42
+  %150 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 7, !dbg !42
+  %151 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 8, !dbg !42
+  %152 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 9, !dbg !42
+  %153 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 10, !dbg !42
+  %154 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 11, !dbg !42
+  %155 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 12, !dbg !42
+  %156 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 13, !dbg !42
+  %157 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 14, !dbg !42
+  %158 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 15, !dbg !42
+  %159 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 16, !dbg !42
+  %160 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 17, !dbg !42
+  %161 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 18, !dbg !42
+  %162 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 19, !dbg !42
+  %163 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 20, !dbg !42
+  %164 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 21, !dbg !42
+  %165 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 22, !dbg !42
+  %166 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 23, !dbg !42
+  %167 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 24, !dbg !42
+  %168 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 25, !dbg !42
+  %169 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 26, !dbg !42
+  %170 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 27, !dbg !42
+  %171 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 28, !dbg !42
+  %172 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 29, !dbg !42
+  %173 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 30, !dbg !42
+  %174 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %139, 31, !dbg !42
+  %175 = tail call { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } asm sideeffect "wgmma.mma_async.sync.aligned.m64n64k16.f32.bf16.bf16 {$0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31}, $64, $65, 1, 1, 1, 0, 0;", "=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,l,l"(float %143, float %144, float %145, float %146, float %147, float %148, float %149, float %150, float %151, float %152, float %153, float %154, float %155, float %156, float %157, float %158, float %159, float %160, float %161, float %162, float %163, float %164, float %165, float %166, float %167, float %168, float %169, float %170, float %171, float %172, float %173, float %174, i64 %141, i64 %142) #3, !dbg !42
+  %176 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 0, !dbg !42
+  %177 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 1, !dbg !42
+  %178 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 2, !dbg !42
+  %179 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 3, !dbg !42
+  %180 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 4, !dbg !42
+  %181 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 5, !dbg !42
+  %182 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 6, !dbg !42
+  %183 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 7, !dbg !42
+  %184 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 8, !dbg !42
+  %185 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 9, !dbg !42
+  %186 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 10, !dbg !42
+  %187 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 11, !dbg !42
+  %188 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 12, !dbg !42
+  %189 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 13, !dbg !42
+  %190 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 14, !dbg !42
+  %191 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 15, !dbg !42
+  %192 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 16, !dbg !42
+  %193 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 17, !dbg !42
+  %194 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 18, !dbg !42
+  %195 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 19, !dbg !42
+  %196 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 20, !dbg !42
+  %197 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 21, !dbg !42
+  %198 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 22, !dbg !42
+  %199 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 23, !dbg !42
+  %200 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 24, !dbg !42
+  %201 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 25, !dbg !42
+  %202 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 26, !dbg !42
+  %203 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 27, !dbg !42
+  %204 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 28, !dbg !42
+  %205 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 29, !dbg !42
+  %206 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 30, !dbg !42
+  %207 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %175, 31, !dbg !42
+  tail call void asm sideeffect "wgmma.commit_group.sync.aligned;", ""() #3, !dbg !42
+  %208 = tail call { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } asm sideeffect "// wait for regs: $0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41\0A\09wgmma.wait_group.sync.aligned 1;", "=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41"(float %176, float %177, float %178, float %179, float %180, float %181, float %182, float %183, float %184, float %185, float %186, float %187, float %188, float %189, float %190, float %191, float %192, float %193, float %194, float %195, float %196, float %197, float %198, float %199, float %200, float %201, float %202, float %203, float %204, float %205, float %206, float %207, ptr addrspace(3) %122, i32 32, i32 1, i32 0, i32 0, ptr addrspace(3) %125, i32 1, i32 32, i32 0, i32 0) #3, !dbg !42
+  %209 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 0, !dbg !42
+  %210 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 1, !dbg !42
+  %211 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 2, !dbg !42
+  %212 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 3, !dbg !42
+  %213 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 4, !dbg !42
+  %214 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 5, !dbg !42
+  %215 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 6, !dbg !42
+  %216 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 7, !dbg !42
+  %217 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 8, !dbg !42
+  %218 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 9, !dbg !42
+  %219 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 10, !dbg !42
+  %220 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 11, !dbg !42
+  %221 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 12, !dbg !42
+  %222 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 13, !dbg !42
+  %223 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 14, !dbg !42
+  %224 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 15, !dbg !42
+  %225 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 16, !dbg !42
+  %226 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 17, !dbg !42
+  %227 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 18, !dbg !42
+  %228 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 19, !dbg !42
+  %229 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 20, !dbg !42
+  %230 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 21, !dbg !42
+  %231 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 22, !dbg !42
+  %232 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 23, !dbg !42
+  %233 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 24, !dbg !42
+  %234 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 25, !dbg !42
+  %235 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 26, !dbg !42
+  %236 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 27, !dbg !42
+  %237 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 28, !dbg !42
+  %238 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 29, !dbg !42
+  %239 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 30, !dbg !42
+  %240 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, ptr addrspace(3), i32, i32, i32, i32, ptr addrspace(3), i32, i32, i32, i32 } %208, 31, !dbg !42
+  %241 = getelementptr i8, ptr addrspace(1) %.pn1679, i64 64, !dbg !39
+  %242 = getelementptr i8, ptr addrspace(1) %.pn4880, i64 64, !dbg !40
+  %243 = getelementptr i8, ptr addrspace(1) %.pn3281, i64 64, !dbg !40
+  %244 = add i32 %83, 1, !dbg !41
+  %245 = icmp slt i32 %244, 4, !dbg !41
+  %246 = select i1 %245, i32 %244, i32 0, !dbg !41
+  %247 = shl i32 %246, 11, !dbg !37
+  %248 = sext i32 %247 to i64, !dbg !37
+  tail call void @llvm.nvvm.barrier0(), !dbg !37
+  %gep = getelementptr i16, ptr addrspace(3) %57, i64 %248, !dbg !37
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %gep, ptr addrspace(1) %241, i32 0, i1 true) #3, !dbg !37
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !37
+  %249 = shl i32 %246, 12, !dbg !38
+  %250 = sext i32 %249 to i64, !dbg !38
+  %251 = getelementptr i16, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i64 16384), i64 %250, !dbg !38
+  %252 = getelementptr i16, ptr addrspace(3) %251, i64 %56, !dbg !38
+  %253 = getelementptr i16, ptr addrspace(3) %251, i64 %61, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %252, ptr addrspace(1) %242, i32 0, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "@$3 cp.async.cg.shared.global [ $0 + 0 ], [ $1 + 0 ], 0x10, $2;", "r,l,r,b"(ptr addrspace(3) %253, ptr addrspace(1) %243, i32 0, i1 true) #3, !dbg !38
+  tail call void asm sideeffect "cp.async.commit_group ;", ""() #3, !dbg !38
+  br i1 %116, label %81, label %254, !dbg !41
+
+254:                                              ; preds = %81
+  %255 = or disjoint i32 %30, 16, !dbg !25
+  %256 = or disjoint i32 %30, 32, !dbg !25
+  %257 = or disjoint i32 %30, 48, !dbg !25
+  %258 = and i32 %33, 120, !dbg !27
+  %259 = or disjoint i32 %31, %258, !dbg !28
+  %260 = tail call { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } asm sideeffect "// wait for regs: $0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31\0A\09wgmma.wait_group.sync.aligned 0;", "=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,=f,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31"(float %209, float %210, float %211, float %212, float %213, float %214, float %215, float %216, float %217, float %218, float %219, float %220, float %221, float %222, float %223, float %224, float %225, float %226, float %227, float %228, float %229, float %230, float %231, float %232, float %233, float %234, float %235, float %236, float %237, float %238, float %239, float %240) #3, !dbg !41
+  tail call void asm sideeffect "cp.async.wait_group 0x0;", ""() #3, !dbg !41
+  tail call void @llvm.nvvm.barrier0(), !dbg !41
+  %261 = icmp slt i32 %30, %3, !dbg !43
+  %262 = icmp slt i32 %255, %3, !dbg !43
+  %263 = icmp slt i32 %256, %3, !dbg !43
+  %264 = icmp slt i32 %257, %3, !dbg !43
+  %265 = icmp slt i32 %259, 3072, !dbg !44
+  %266 = and i1 %265, %261, !dbg !45
+  %267 = and i1 %262, %265, !dbg !45
+  %268 = and i1 %263, %265, !dbg !45
+  %269 = and i1 %264, %265, !dbg !45
+  %270 = mul i32 %30, 3072, !dbg !46
+  %271 = mul i32 %255, 3072, !dbg !46
+  %272 = mul i32 %256, 3072, !dbg !46
+  %273 = mul i32 %257, 3072, !dbg !46
+  %274 = add i32 %270, %259, !dbg !47
+  %275 = add i32 %259, %271, !dbg !47
+  %276 = add i32 %259, %272, !dbg !47
+  %277 = add i32 %259, %273, !dbg !47
+  %278 = sext i32 %274 to i64, !dbg !48
+  %279 = getelementptr i16, ptr addrspace(1) %2, i64 %278, !dbg !48
+  %280 = sext i32 %275 to i64, !dbg !48
+  %281 = getelementptr i16, ptr addrspace(1) %2, i64 %280, !dbg !48
+  %282 = sext i32 %276 to i64, !dbg !48
+  %283 = getelementptr i16, ptr addrspace(1) %2, i64 %282, !dbg !48
+  %284 = sext i32 %277 to i64, !dbg !48
+  %285 = getelementptr i16, ptr addrspace(1) %2, i64 %284, !dbg !48
+  %286 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 0, !dbg !49
+  %287 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 1, !dbg !49
+  %288 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 2, !dbg !49
+  %289 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 3, !dbg !49
+  %290 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 4, !dbg !49
+  %291 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 5, !dbg !49
+  %292 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 6, !dbg !49
+  %293 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 7, !dbg !49
+  %294 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 8, !dbg !49
+  %295 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 9, !dbg !49
+  %296 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 10, !dbg !49
+  %297 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 11, !dbg !49
+  %298 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 12, !dbg !49
+  %299 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 13, !dbg !49
+  %300 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 14, !dbg !49
+  %301 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 15, !dbg !49
+  %302 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 16, !dbg !49
+  %303 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 17, !dbg !49
+  %304 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 18, !dbg !49
+  %305 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 19, !dbg !49
+  %306 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 20, !dbg !49
+  %307 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 21, !dbg !49
+  %308 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 22, !dbg !49
+  %309 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 23, !dbg !49
+  %310 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 24, !dbg !49
+  %311 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 25, !dbg !49
+  %312 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 26, !dbg !49
+  %313 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 27, !dbg !49
+  %314 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 28, !dbg !49
+  %315 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 29, !dbg !49
+  %316 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 30, !dbg !49
+  %317 = extractvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } %260, 31, !dbg !49
+  %318 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %286) #3, !dbg !49
+  %319 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %287) #3, !dbg !49
+  %320 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %288) #3, !dbg !49
+  %321 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %289) #3, !dbg !49
+  %322 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %290) #3, !dbg !49
+  %323 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %291) #3, !dbg !49
+  %324 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %292) #3, !dbg !49
+  %325 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %293) #3, !dbg !49
+  %326 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %294) #3, !dbg !49
+  %327 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %295) #3, !dbg !49
+  %328 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %296) #3, !dbg !49
+  %329 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %297) #3, !dbg !49
+  %330 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %298) #3, !dbg !49
+  %331 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %299) #3, !dbg !49
+  %332 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %300) #3, !dbg !49
+  %333 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %301) #3, !dbg !49
+  %334 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %302) #3, !dbg !49
+  %335 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %303) #3, !dbg !49
+  %336 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %304) #3, !dbg !49
+  %337 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %305) #3, !dbg !49
+  %338 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %306) #3, !dbg !49
+  %339 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %307) #3, !dbg !49
+  %340 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %308) #3, !dbg !49
+  %341 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %309) #3, !dbg !49
+  %342 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %310) #3, !dbg !49
+  %343 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %311) #3, !dbg !49
+  %344 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %312) #3, !dbg !49
+  %345 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %313) #3, !dbg !49
+  %346 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %314) #3, !dbg !49
+  %347 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %315) #3, !dbg !49
+  %348 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %316) #3, !dbg !49
+  %349 = tail call i16 asm "cvt.rn.bf16.f32 $0, $1;", "=h,r"(float %317) #3, !dbg !49
+  %350 = and i32 %20, 15, !dbg !49
+  %351 = lshr i32 %20, 1, !dbg !49
+  %352 = shl nuw nsw i32 %21, 4, !dbg !49
+  %353 = and i32 %352, 48, !dbg !49
+  %reass.add = or disjoint i32 %353, %350
+  %reass.mul = mul nuw nsw i32 %reass.add, 136
+  %354 = and i32 %351, 72, !dbg !49
+  %355 = add nuw nsw i32 %354, %reass.mul, !dbg !49
+  %356 = insertelement <2 x i16> poison, i16 %318, i64 0, !dbg !49
+  %357 = insertelement <2 x i16> %356, i16 %319, i64 1, !dbg !49
+  %358 = bitcast <2 x i16> %357 to i32, !dbg !49
+  %359 = insertelement <2 x i16> poison, i16 %320, i64 0, !dbg !49
+  %360 = insertelement <2 x i16> %359, i16 %321, i64 1, !dbg !49
+  %361 = bitcast <2 x i16> %360 to i32, !dbg !49
+  %362 = insertelement <2 x i16> poison, i16 %322, i64 0, !dbg !49
+  %363 = insertelement <2 x i16> %362, i16 %323, i64 1, !dbg !49
+  %364 = bitcast <2 x i16> %363 to i32, !dbg !49
+  %365 = insertelement <2 x i16> poison, i16 %324, i64 0, !dbg !49
+  %366 = insertelement <2 x i16> %365, i16 %325, i64 1, !dbg !49
+  %367 = bitcast <2 x i16> %366 to i32, !dbg !49
+  %368 = zext nneg i32 %355 to i64, !dbg !49
+  %369 = getelementptr i16, ptr addrspace(3) @global_smem, i64 %368, !dbg !49
+  %370 = ptrtoint ptr addrspace(3) %369 to i64, !dbg !49
+  %371 = trunc i64 %370 to i32, !dbg !49
+  tail call void asm sideeffect "stmatrix.sync.aligned.m8n8.x4.shared.b16 [$0], {$1, $2, $3, $4};", "r,r,r,r,r"(i32 %371, i32 %358, i32 %361, i32 %364, i32 %367) #3, !dbg !49
+  %372 = insertelement <2 x i16> poison, i16 %326, i64 0, !dbg !49
+  %373 = insertelement <2 x i16> %372, i16 %327, i64 1, !dbg !49
+  %374 = bitcast <2 x i16> %373 to i32, !dbg !49
+  %375 = insertelement <2 x i16> poison, i16 %328, i64 0, !dbg !49
+  %376 = insertelement <2 x i16> %375, i16 %329, i64 1, !dbg !49
+  %377 = bitcast <2 x i16> %376 to i32, !dbg !49
+  %378 = insertelement <2 x i16> poison, i16 %330, i64 0, !dbg !49
+  %379 = insertelement <2 x i16> %378, i16 %331, i64 1, !dbg !49
+  %380 = bitcast <2 x i16> %379 to i32, !dbg !49
+  %381 = insertelement <2 x i16> poison, i16 %332, i64 0, !dbg !49
+  %382 = insertelement <2 x i16> %381, i16 %333, i64 1, !dbg !49
+  %383 = bitcast <2 x i16> %382 to i32, !dbg !49
+  %384 = getelementptr i8, ptr addrspace(3) %369, i64 32, !dbg !49
+  %385 = ptrtoint ptr addrspace(3) %384 to i64, !dbg !49
+  %386 = trunc i64 %385 to i32, !dbg !49
+  tail call void asm sideeffect "stmatrix.sync.aligned.m8n8.x4.shared.b16 [$0], {$1, $2, $3, $4};", "r,r,r,r,r"(i32 %386, i32 %374, i32 %377, i32 %380, i32 %383) #3, !dbg !49
+  %387 = insertelement <2 x i16> poison, i16 %334, i64 0, !dbg !49
+  %388 = insertelement <2 x i16> %387, i16 %335, i64 1, !dbg !49
+  %389 = bitcast <2 x i16> %388 to i32, !dbg !49
+  %390 = insertelement <2 x i16> poison, i16 %336, i64 0, !dbg !49
+  %391 = insertelement <2 x i16> %390, i16 %337, i64 1, !dbg !49
+  %392 = bitcast <2 x i16> %391 to i32, !dbg !49
+  %393 = insertelement <2 x i16> poison, i16 %338, i64 0, !dbg !49
+  %394 = insertelement <2 x i16> %393, i16 %339, i64 1, !dbg !49
+  %395 = bitcast <2 x i16> %394 to i32, !dbg !49
+  %396 = insertelement <2 x i16> poison, i16 %340, i64 0, !dbg !49
+  %397 = insertelement <2 x i16> %396, i16 %341, i64 1, !dbg !49
+  %398 = bitcast <2 x i16> %397 to i32, !dbg !49
+  %399 = getelementptr i8, ptr addrspace(3) %369, i64 64, !dbg !49
+  %400 = ptrtoint ptr addrspace(3) %399 to i64, !dbg !49
+  %401 = trunc i64 %400 to i32, !dbg !49
+  tail call void asm sideeffect "stmatrix.sync.aligned.m8n8.x4.shared.b16 [$0], {$1, $2, $3, $4};", "r,r,r,r,r"(i32 %401, i32 %389, i32 %392, i32 %395, i32 %398) #3, !dbg !49
+  %402 = insertelement <2 x i16> poison, i16 %342, i64 0, !dbg !49
+  %403 = insertelement <2 x i16> %402, i16 %343, i64 1, !dbg !49
+  %404 = bitcast <2 x i16> %403 to i32, !dbg !49
+  %405 = insertelement <2 x i16> poison, i16 %344, i64 0, !dbg !49
+  %406 = insertelement <2 x i16> %405, i16 %345, i64 1, !dbg !49
+  %407 = bitcast <2 x i16> %406 to i32, !dbg !49
+  %408 = insertelement <2 x i16> poison, i16 %346, i64 0, !dbg !49
+  %409 = insertelement <2 x i16> %408, i16 %347, i64 1, !dbg !49
+  %410 = bitcast <2 x i16> %409 to i32, !dbg !49
+  %411 = insertelement <2 x i16> poison, i16 %348, i64 0, !dbg !49
+  %412 = insertelement <2 x i16> %411, i16 %349, i64 1, !dbg !49
+  %413 = bitcast <2 x i16> %412 to i32, !dbg !49
+  %414 = getelementptr i8, ptr addrspace(3) %369, i64 96, !dbg !49
+  %415 = ptrtoint ptr addrspace(3) %414 to i64, !dbg !49
+  %416 = trunc i64 %415 to i32, !dbg !49
+  tail call void asm sideeffect "stmatrix.sync.aligned.m8n8.x4.shared.b16 [$0], {$1, $2, $3, $4};", "r,r,r,r,r"(i32 %416, i32 %404, i32 %407, i32 %410, i32 %413) #3, !dbg !49
+  tail call void @llvm.nvvm.barrier0(), !dbg !49
+  %417 = shl nuw nsw i32 %21, 1, !dbg !49
+  %418 = and i32 %417, 14, !dbg !49
+  %419 = or disjoint i32 %418, %.lobit1, !dbg !49
+  %420 = mul nuw nsw i32 %419, 136, !dbg !49
+  %421 = add nuw nsw i32 %420, %258, !dbg !49
+  %422 = zext nneg i32 %421 to i64, !dbg !49
+  %423 = getelementptr i16, ptr addrspace(3) @global_smem, i64 %422, !dbg !49
+  %424 = getelementptr i8, ptr addrspace(3) %423, i64 4352, !dbg !49
+  %425 = load <4 x i32>, ptr addrspace(3) %424, align 16, !dbg !49
+  %426 = getelementptr i8, ptr addrspace(3) %423, i64 8704, !dbg !49
+  %427 = load <4 x i32>, ptr addrspace(3) %426, align 16, !dbg !49
+  %428 = getelementptr i8, ptr addrspace(3) %423, i64 13056, !dbg !49
+  %429 = load <4 x i32>, ptr addrspace(3) %428, align 16, !dbg !49
+  %.extract = load i32, ptr addrspace(3) %423, align 16, !dbg !49
+  %430 = getelementptr inbounds i8, ptr addrspace(3) %423, i64 4, !dbg !49
+  %.extract50 = load i32, ptr addrspace(3) %430, align 4, !dbg !49
+  %431 = getelementptr inbounds i8, ptr addrspace(3) %423, i64 8, !dbg !49
+  %.extract52 = load i32, ptr addrspace(3) %431, align 8, !dbg !49
+  %432 = getelementptr inbounds i8, ptr addrspace(3) %423, i64 12, !dbg !49
+  %.extract54 = load i32, ptr addrspace(3) %432, align 4, !dbg !49
+  tail call void asm sideeffect "@$5 st.global.v4.b32 [ $4 + 0 ], { $0, $1, $2, $3 };", "r,r,r,r,l,b"(i32 %.extract, i32 %.extract50, i32 %.extract52, i32 %.extract54, ptr addrspace(1) %279, i1 %266) #3, !dbg !49
+  %.extract56 = extractelement <4 x i32> %425, i64 0, !dbg !49
+  %.extract58 = extractelement <4 x i32> %425, i64 1, !dbg !49
+  %.extract60 = extractelement <4 x i32> %425, i64 2, !dbg !49
+  %.extract62 = extractelement <4 x i32> %425, i64 3, !dbg !49
+  tail call void asm sideeffect "@$5 st.global.v4.b32 [ $4 + 0 ], { $0, $1, $2, $3 };", "r,r,r,r,l,b"(i32 %.extract56, i32 %.extract58, i32 %.extract60, i32 %.extract62, ptr addrspace(1) %281, i1 %267) #3, !dbg !49
+  %.extract64 = extractelement <4 x i32> %427, i64 0, !dbg !49
+  %.extract66 = extractelement <4 x i32> %427, i64 1, !dbg !49
+  %.extract68 = extractelement <4 x i32> %427, i64 2, !dbg !49
+  %.extract70 = extractelement <4 x i32> %427, i64 3, !dbg !49
+  tail call void asm sideeffect "@$5 st.global.v4.b32 [ $4 + 0 ], { $0, $1, $2, $3 };", "r,r,r,r,l,b"(i32 %.extract64, i32 %.extract66, i32 %.extract68, i32 %.extract70, ptr addrspace(1) %283, i1 %268) #3, !dbg !49
+  %.extract72 = extractelement <4 x i32> %429, i64 0, !dbg !49
+  %.extract74 = extractelement <4 x i32> %429, i64 1, !dbg !49
+  %.extract76 = extractelement <4 x i32> %429, i64 2, !dbg !49
+  %.extract78 = extractelement <4 x i32> %429, i64 3, !dbg !49
+  tail call void asm sideeffect "@$5 st.global.v4.b32 [ $4 + 0 ], { $0, $1, $2, $3 };", "r,r,r,r,l,b"(i32 %.extract72, i32 %.extract74, i32 %.extract76, i32 %.extract78, ptr addrspace(1) %285, i1 %269) #3, !dbg !49
+  br label %common.ret
+}
+
+; Function Attrs: mustprogress nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare i32 @llvm.smin.i32(i32, i32) #0
+
+; Function Attrs: mustprogress nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare noundef i32 @llvm.nvvm.read.ptx.sreg.tid.x() #0
+
+; Function Attrs: convergent nocallback nounwind
+declare void @llvm.nvvm.barrier0() #1
+
+; Function Attrs: convergent nocallback nounwind memory(inaccessiblemem: readwrite)
+declare i32 @llvm.nvvm.shfl.sync.idx.i32(i32, i32, i32, i32) #2
+
+attributes #0 = { mustprogress nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #1 = { convergent nocallback nounwind }
+attributes #2 = { convergent nocallback nounwind memory(inaccessiblemem: readwrite) }
+attributes #3 = { nounwind }
+
+!llvm.module.flags = !{!0, !1}
+!llvm.dbg.cu = !{!2}
+!nvvm.annotations = !{!4, !5}
+!llvm.ident = !{!6}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = !{i32 4, !"nvvm-reflect-ftz", i32 1}
+!2 = distinct !DICompileUnit(language: DW_LANG_C, file: !3, producer: "triton", isOptimized: true, runtimeVersion: 0, emissionKind: LineTablesOnly)
+!3 = !DIFile(filename: "c3b57jbe32qdhxmxtac4le5piqagwa6lsfv3msvale6f2op2rj3d.py", directory: "/opt/inductor_cache/3b")
+!4 = !{ptr @triton_mm, !"kernel", i32 1}
+!5 = !{ptr @triton_mm, !"maxntidx", i32 256}
+!6 = !{!"clang version 3.8.0 (tags/RELEASE_380/final)"}
+!7 = distinct !DISubprogram(name: "triton_mm", linkageName: "triton_mm", scope: !3, file: !3, line: 18, type: !8, scopeLine: 18, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !2)
+!8 = !DISubroutineType(cc: DW_CC_normal, types: !9)
+!9 = !{}
+!10 = !DILocation(line: 33, column: 11, scope: !7)
+!11 = !DILocation(line: 33, column: 16, scope: !7)
+!12 = !DILocation(line: 0, scope: !7)
+!13 = !DILocation(line: 42, column: 24, scope: !7)
+!14 = !DILocation(line: 43, column: 28, scope: !7)
+!15 = !DILocation(line: 43, column: 34, scope: !7)
+!16 = !DILocation(line: 48, column: 22, scope: !7)
+!17 = !DILocation(line: 49, column: 41, scope: !7)
+!18 = !DILocation(line: 49, column: 30, scope: !7)
+!19 = !DILocation(line: 49, column: 50, scope: !7)
+!20 = !DILocation(line: 50, column: 40, scope: !7)
+!21 = !DILocation(line: 50, column: 34, scope: !7)
+!22 = !DILocation(line: 51, column: 30, scope: !7)
+!23 = !DILocation(line: 53, column: 17, scope: !7)
+!24 = !DILocation(line: 53, column: 40, scope: !7)
+!25 = !DILocation(line: 53, column: 27, scope: !7)
+!26 = !DILocation(line: 54, column: 17, scope: !7)
+!27 = !DILocation(line: 54, column: 40, scope: !7)
+!28 = !DILocation(line: 54, column: 27, scope: !7)
+!29 = !DILocation(line: 56, column: 52, scope: !7)
+!30 = !DILocation(line: 60, column: 52, scope: !7)
+!31 = !DILocation(line: 64, column: 28, scope: !7)
+!32 = !DILocation(line: 64, column: 40, scope: !7)
+!33 = !DILocation(line: 64, column: 13, scope: !7)
+!34 = !DILocation(line: 65, column: 54, scope: !7)
+!35 = !DILocation(line: 65, column: 39, scope: !7)
+!36 = !DILocation(line: 65, column: 13, scope: !7)
+!37 = !DILocation(line: 70, column: 24, scope: !7)
+!38 = !DILocation(line: 71, column: 24, scope: !7)
+!39 = !DILocation(line: 78, column: 13, scope: !7)
+!40 = !DILocation(line: 79, column: 13, scope: !7)
+!41 = !DILocation(line: 68, column: 25, scope: !7)
+!42 = !DILocation(line: 77, column: 25, scope: !7)
+!43 = !DILocation(line: 86, column: 20, scope: !7)
+!44 = !DILocation(line: 86, column: 34, scope: !7)
+!45 = !DILocation(line: 86, column: 26, scope: !7)
+!46 = !DILocation(line: 89, column: 27, scope: !7)
+!47 = !DILocation(line: 89, column: 22, scope: !7)
+!48 = !DILocation(line: 90, column: 25, scope: !7)
+!49 = !DILocation(line: 90, column: 67, scope: !7)

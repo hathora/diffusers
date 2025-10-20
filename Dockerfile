@@ -14,7 +14,7 @@ RUN pip install --upgrade pip setuptools wheel \
  && pip install --index-url https://download.pytorch.org/whl/cu124 \
     torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1
 
-COPY setup.py README.md .
+COPY setup.py README.md ./
 COPY src/ ./src
 RUN pip install -e .[torch]
 
@@ -31,17 +31,25 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost
 ENV USE_TRITON_OPS=0
 ENV USE_TORCH_COMPILE=1
 
-ENV TORCH_COMPILE_MODE=max-autotune-no-cudagraphs
 ENV MAX_AUTOTUNE_GEMM_SEARCH_SPACE=2
 ENV MAX_AUTOTUNE_POINTWISE_SEARCH_SPACE=2
 
 ENV COMPILE_VAE=0
 ENV VERBOSE_COMPILE=1
-ENV WARMUP_SHAPE=1024x1024
+# Warmup shape: used for image models, auto-capped at 832x480 for Wan video
+ENV WARMUP_SHAPE=512x512,768x768,1024x1024,1280x720,1920x1080
 
-ENV TORCH_COMPILE_CACHE_DIR=/app/.cache/torch_compile
-ENV TRITON_CACHE_DIR=/app/.cache/triton
+# Wan video optimizations
+ENV VAE_AUTOCAST_BF16=1
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-RUN mkdir -p /app/.cache/torch_compile /app/.cache/triton
+# Use /opt for persistent cache paths (easier to bake precompiled caches)
+ENV TORCHINDUCTOR_CACHE_DIR=/opt/inductor_cache
+ENV TRITON_CACHE_DIR=/opt/triton_cache
+ENV TORCH_COMPILE_CACHE_DIR=/opt/inductor_cache
+
+RUN mkdir -p /opt/inductor_cache /opt/triton_cache
+COPY flux_cache/ /opt/
+RUN chmod -R a+rX /opt/inductor_cache /opt/triton_cache
 
 ENTRYPOINT ["/app/entrypoint.sh"]
