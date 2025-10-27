@@ -37,15 +37,32 @@ def setup_compile_optimizations():
     - Use pre-tuned configs for common operations
     - Skip excessive kernel benchmarking
     """
-    cache_dir = os.getenv("TORCH_COMPILE_CACHE_DIR", "/app/.cache/torch_compile")
-    triton_cache_dir = os.getenv("TRITON_CACHE_DIR", "/app/.cache/triton")
+    # FLUX uses /opt/*_cache (baked in), other models DON'T use any cache
+    model_id = os.getenv("MODEL_ID", "").lower()
     
-    os.makedirs(cache_dir, exist_ok=True)
-    os.makedirs(triton_cache_dir, exist_ok=True)
-    
-    os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
-    os.environ["TRITON_CACHE_DIR"] = triton_cache_dir
-    os.environ["TORCHINDUCTOR_FX_GRAPH_CACHE"] = "1"
+    if "flux" in model_id:
+        # FLUX uses the baked-in cache
+        cache_dir = "/opt/inductor_cache"
+        triton_cache_dir = "/opt/triton_cache"
+        
+        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(triton_cache_dir, exist_ok=True)
+        
+        os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
+        os.environ["TRITON_CACHE_DIR"] = triton_cache_dir
+        os.environ["TORCHINDUCTOR_FX_GRAPH_CACHE"] = "1"
+    else:
+        # Wan and other models: disable torch.compile cache entirely
+        # This prevents loading FLUX cache files into memory
+        if "TORCHINDUCTOR_CACHE_DIR" in os.environ:
+            del os.environ["TORCHINDUCTOR_CACHE_DIR"]
+        if "TRITON_CACHE_DIR" in os.environ:
+            del os.environ["TRITON_CACHE_DIR"]
+        if "TORCHINDUCTOR_FX_GRAPH_CACHE" in os.environ:
+            del os.environ["TORCHINDUCTOR_FX_GRAPH_CACHE"]
+        
+        print("INFO: Torch.compile cache disabled for non-FLUX models")
+        return  # Skip the rest of compile optimization setup
     
     max_autotune_gemm = os.getenv("MAX_AUTOTUNE_GEMM_SEARCH_SPACE", "4")
     os.environ["MAX_AUTOTUNE_GEMM_SEARCH_SPACE"] = max_autotune_gemm
@@ -144,7 +161,11 @@ def setup_dynamic_shapes():
     logging.info("Verbose compile logs: Level %s", verbose_compile)
     logging.info("=" * 60)
 
-setup_dynamic_shapes()
+model_id_env = os.getenv("MODEL_ID", "").lower()
+if "flux" in model_id_env or os.getenv("USE_TORCH_COMPILE", "1") == "1":
+    setup_dynamic_shapes()
+else:
+    logging.info("Skipping torch.compile setup for non-FLUX models")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("diffusers_svc")
@@ -438,25 +459,60 @@ async def startup():
     model_id = _normalize_to_diffusers_repo(model_id)
     model_id = _resolve_model_id(model_id)
     logger.info(f"Loading pipeline: {model_id}")
+    
+    offload_model = os.getenv("WAN_OFFLOAD_MODEL", "0").lower() in ("1", "true", "yes")
+    convert_model_dtype = os.getenv("WAN_CONVERT_DTYPE", "0").lower() in ("1", "true", "yes")
+    t5_cpu = os.getenv("WAN_T5_CPU", "0").lower() in ("1", "true", "yes")
+    
     torch_dtype = torch.bfloat16 if os.getenv("VAE_AUTOCAST_BF16", "1").lower() in ("1","true","yes") else torch.float16
     device = 0 if torch.cuda.is_available() else -1
     try:
-        if "Wan2.1-T2V" in model_id:
+        if "Wan2.1-T2V" in model_id or "Wan2.2-T2V" in model_id or "Wan2.2-TI2V" in model_id:
+            try:
+                import torch._dynamo as dynamo
+                dynamo.config.suppress_errors = True
+                dynamo.reset()
+                torch.jit._state.disable()
+                logger.info("Disabled torch.compile and JIT for Wan model")
+            except Exception as e:
+                logger.warning(f"Could not disable torch.compile/JIT: {e}")
+            # Apply OOM mitigation: keep T5 on CPU if requested
+            text_encoder_device = "cpu" if t5_cpu else None
+            text_encoder_dtype = torch_dtype if convert_model_dtype else (torch.bfloat16 if torch_dtype == torch.bfloat16 else torch.float32)
+            
+            transformer_dtype = torch_dtype if convert_model_dtype else None
+            
             tokenizer = AutoTokenizer.from_pretrained(model_id, subfolder="tokenizer", use_fast=True)
             text_encoder = UMT5EncoderModel.from_pretrained(
                 model_id,
                 subfolder="text_encoder",
-                torch_dtype=torch.bfloat16 if torch_dtype == torch.bfloat16 else torch.float32,
-                low_cpu_mem_usage=False,
+                torch_dtype=text_encoder_dtype,
+                low_cpu_mem_usage=True,
             )
-            vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
+            if text_encoder_device == "cpu":
+                text_encoder = text_encoder.to("cpu")
+                logger.info("T5 text encoder kept on CPU to reduce VRAM usage")
+            
+            vae = AutoencoderKLWan.from_pretrained(
+                model_id, 
+                subfolder="vae", 
+                torch_dtype=torch.float32,
+                low_cpu_mem_usage=True
+            )
+            
             pipe = WanPipeline.from_pretrained(
                 model_id,
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
                 vae=vae,
+                torch_dtype=transformer_dtype,
+                low_cpu_mem_usage=True,
             )
-            flow_shift = float(os.getenv("WAN_FLOW_SHIFT", "3.0"))
+            # Wan2.2 uses different flow_shift defaults
+            if "Wan2.2" in model_id:
+                flow_shift = float(os.getenv("WAN_FLOW_SHIFT", "7.0"))  # Higher for Wan2.2
+            else:
+                flow_shift = float(os.getenv("WAN_FLOW_SHIFT", "3.0"))  # Wan2.1 default
             pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
         else:
             try:
@@ -472,7 +528,13 @@ async def startup():
             except Exception:
                 pipe = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=False)
         if device >= 0:
-            pipe.to("cuda")
+            if offload_model:
+                # Use model CPU offloading to reduce VRAM
+                logger.info("Enabling model CPU offloading to reduce VRAM usage")
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to("cuda")
+        
         # Initialize compile manager lock
         if _COMPILE_STATE.get("swap_lock") is None:
             _COMPILE_STATE["swap_lock"] = asyncio.Lock()
@@ -488,10 +550,17 @@ async def startup():
             cuda_alloc = os.getenv("PYTORCH_CUDA_ALLOC_CONF", "")
             logger.info(f"VAE BF16 Autocast: {'Enabled' if vae_autocast else 'Disabled'}")
             logger.info(f"CUDA Allocator: {cuda_alloc if cuda_alloc else 'Default'}")
+            logger.info(f"Model CPU Offload: {'Enabled' if offload_model else 'Disabled'}")
+            logger.info(f"Convert Model Dtype: {'Enabled' if convert_model_dtype else 'Disabled'}")
+            logger.info(f"T5 on CPU: {'Enabled' if t5_cpu else 'Disabled'}")
             if vae_autocast:
                 logger.info("  VAE will use bfloat16 for faster decoding & lower memory")
             if "expandable_segments" in cuda_alloc:
                 logger.info("  Memory allocator uses expandable segments (reduces fragmentation)")
+            if offload_model:
+                logger.info("  Models will be offloaded to CPU when not in use")
+            if t5_cpu:
+                logger.info("  T5 text encoder kept on CPU to save VRAM")
             logger.info("=" * 70)
         
         # Compile the model with torch.compile for faster inference

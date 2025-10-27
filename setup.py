@@ -134,7 +134,7 @@ _deps = [
     "torchao>=0.7.0",
     "bitsandbytes>=0.43.3",
     "nvidia_modelopt[hf]>=0.33.1",
-    "regex!=2019.12.17",
+    "regex",
     "requests",
     "tensorboard",
     "tiktoken>=0.7.0",

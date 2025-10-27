@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load preset if specified
+PRESET="${WAN_PRESET:-}"
+if [[ -n "${PRESET}" ]]; then
+  PRESET_FILE="/app/presets/${PRESET}.env"
+  if [[ -f "${PRESET_FILE}" ]]; then
+    echo "[entrypoint] Loading preset: ${PRESET}"
+    set -a  # automatically export all variables
+    source "${PRESET_FILE}"
+    set +a
+  else
+    echo "[entrypoint] WARNING: Preset '${PRESET}' not found at ${PRESET_FILE}"
+  fi
+fi
+
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 export UVICORN_WORKERS="${UVICORN_WORKERS:-1}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
@@ -16,7 +30,12 @@ if [[ -z "${MODEL_PATH}" && -n "${MODEL_ID}" ]]; then
   export MODEL_PATH="${MODEL_ID}"
 fi
 
-export VACE_AUTOCast_BF16="${VACE_AUTOCast_BF16:-true}"
+export VAE_AUTOCAST_BF16="${VAE_AUTOCAST_BF16:-true}"
+
+# Wan OOM mitigation defaults (can be overridden)
+export WAN_OFFLOAD_MODEL="${WAN_OFFLOAD_MODEL:-0}"
+export WAN_T5_CPU="${WAN_T5_CPU:-1}"
+export WAN_CONVERT_DTYPE="${WAN_CONVERT_DTYPE:-1}"
 
 # CUDA envs
 export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
@@ -24,6 +43,13 @@ export PATH="${CUDA_HOME}/bin:${PATH}"
 
 # Diagnostics
 echo "[entrypoint] Starting Diffusers service on port 8000 (host 0.0.0.0)"
+if [[ -n "${PRESET}" ]]; then
+  echo "[entrypoint] Active preset: ${PRESET}"
+  echo "[entrypoint] MODEL_ID: ${MODEL_ID}"
+  echo "[entrypoint] WAN_OFFLOAD_MODEL: ${WAN_OFFLOAD_MODEL}"
+  echo "[entrypoint] WAN_T5_CPU: ${WAN_T5_CPU}"
+  echo "[entrypoint] WAN_CONVERT_DTYPE: ${WAN_CONVERT_DTYPE}"
+fi
 which nvidia-smi >/dev/null 2>&1 && nvidia-smi || echo "[entrypoint] nvidia-smi not found; continuing"
 python - <<'PY'
 try:

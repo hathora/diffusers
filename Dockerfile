@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install --upgrade pip setuptools wheel \
  && pip install --index-url https://download.pytorch.org/whl/cu124 \
-    torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0
 
 COPY setup.py README.md ./
 COPY src/ ./src
@@ -42,11 +42,6 @@ ENV WARMUP_SHAPE=512x512,768x768,1024x1024,1280x720,1920x1080
 # Wan video optimizations
 ENV VAE_AUTOCAST_BF16=1
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-# Use /opt for persistent cache paths (easier to bake precompiled caches)
-ENV TORCHINDUCTOR_CACHE_DIR=/opt/inductor_cache
-ENV TRITON_CACHE_DIR=/opt/triton_cache
-ENV TORCH_COMPILE_CACHE_DIR=/opt/inductor_cache
 
 RUN mkdir -p /opt/inductor_cache /opt/triton_cache
 COPY flux_cache/ /opt/
